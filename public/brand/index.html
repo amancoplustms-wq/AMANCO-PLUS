@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>حزمة هوية وشعار أمانكو بلس | AMANCO PLUS Brand Kit</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #090d16;
+      color: #f8fafc;
+      font-family: 'Cairo', sans-serif;
+      line-height: 1.6;
+      padding: 40px 20px 80px;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    header {
+      text-align: center;
+      margin-bottom: 50px;
+      padding-bottom: 30px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .badge {
+      display: inline-block;
+      padding: 6px 16px;
+      border-radius: 999px;
+      background: rgba(249, 115, 22, 0.15);
+      color: #f97316;
+      font-weight: 700;
+      font-size: 14px;
+      margin-bottom: 16px;
+      border: 1px solid rgba(249, 115, 22, 0.3);
+    }
+    h1 {
+      font-size: 38px;
+      font-weight: 900;
+      margin-bottom: 12px;
+      letter-spacing: -0.5px;
+    }
+    p.subtitle {
+      color: #94a3b8;
+      font-size: 18px;
+      max-width: 700px;
+      margin: 0 auto 24px;
+    }
+    .btn-download-all {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 32px;
+      background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+      color: #ffffff;
+      font-weight: 800;
+      font-size: 17px;
+      border-radius: 12px;
+      text-decoration: none;
+      box-shadow: 0 10px 25px -5px rgba(249, 115, 22, 0.4);
+      transition: all 0.2s ease;
+    }
+    .btn-download-all:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 15px 30px -5px rgba(249, 115, 22, 0.6);
+    }
+
+    /* Colors Section */
+    .colors-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 50px;
+    }
+    .color-card {
+      background: #111827;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 14px;
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .color-swatch {
+      width: 48px;
+      height: 48px;
+      border-radius: 10px;
+      flex-shrink: 0;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+    .color-name {
+      font-size: 15px;
+      font-weight: 700;
+      color: #fff;
+    }
+    .color-hex {
+      font-size: 13px;
+      font-family: monospace;
+      color: #94a3b8;
+      direction: ltr;
+      text-align: right;
+    }
+
+    /* Section Title */
+    .section-title {
+      font-size: 24px;
+      font-weight: 800;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .section-title::before {
+      content: '';
+      display: inline-block;
+      width: 6px;
+      height: 24px;
+      background: #f97316;
+      border-radius: 3px;
+    }
+
+    /* Assets Grid */
+    .assets-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+      gap: 28px;
+      margin-bottom: 50px;
+    }
+    .asset-card {
+      background: #111827;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 18px;
+      overflow: hidden;
+      display: flex;
+      flex-col;
+      flex-direction: column;
+      transition: border-color 0.2s ease;
+    }
+    .asset-card:hover {
+      border-color: rgba(249, 115, 22, 0.4);
+    }
+    .preview-box {
+      min-height: 220px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      position: relative;
+    }
+    .bg-dark {
+      background: #0b1120;
+    }
+    .bg-white {
+      background: #ffffff;
+    }
+    .bg-transparent-grid {
+      background-color: #1e293b;
+      background-image:
+        linear-gradient(45deg, #0f172a 25%, transparent 25%),
+        linear-gradient(-45deg, #0f172a 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #0f172a 75%),
+        linear-gradient(-45deg, transparent 75%, #0f172a 75%);
+      background-size: 20px 20px;
+      background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+    }
+    .preview-img {
+      max-width: 100%;
+      max-height: 180px;
+      object-fit: contain;
+      filter: drop-shadow(0 4px 12px rgba(0,0,0,0.2));
+    }
+    .asset-info {
+      padding: 20px 24px;
+      background: #0d131f;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      flex: 1;
+    }
+    .asset-title {
+      font-size: 18px;
+      font-weight: 800;
+      color: #fff;
+    }
+    .asset-desc {
+      font-size: 14px;
+      color: #94a3b8;
+    }
+    .asset-meta {
+      display: flex;
+      gap: 12px;
+      font-size: 13px;
+      color: #64748b;
+      margin-top: auto;
+      padding-top: 10px;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .asset-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 8px;
+    }
+    .btn-download {
+      flex: 1;
+      text-align: center;
+      padding: 10px 16px;
+      background: #1e293b;
+      color: #f8fafc;
+      font-weight: 700;
+      font-size: 14px;
+      border-radius: 8px;
+      text-decoration: none;
+      transition: all 0.2s;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .btn-download:hover {
+      background: #f97316;
+      color: #ffffff;
+      border-color: #f97316;
+    }
+
+    footer {
+      text-align: center;
+      margin-top: 60px;
+      color: #64748b;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <div class="badge">هوية بصرية معتمدة • أمانكو بلس</div>
+      <h1>حزمة صور وشعارات أمانكو بلس (Amanco Plus)</h1>
+      <p class="subtitle">
+        دليل وملفات الشعار الرسمي بكافة الصيغ والقياسات (PNG فائقة الدقة 4K وخلفيات شفافة وملفات فيكتور SVG وصور البروفايل).
+      </p>
+      <div>
+        <a href="amanco-plus-brand-kit.zip" download class="btn-download-all">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          تحميل كافة الملفات في أرشيف واحد (ZIP - 3.4 MB)
+        </a>
+      </div>
+    </header>
+
+    <!-- ألوان الهوية -->
+    <div class="section-title">ألوان الهوية الرسمية (Brand Colors)</div>
+    <div class="colors-grid">
+      <div class="color-card">
+        <div class="color-swatch" style="background: #0f172a;"></div>
+        <div>
+          <div class="color-name">كحلي لوجستي داكن</div>
+          <div class="color-hex">#0F172A</div>
+        </div>
+      </div>
+      <div class="color-card">
+        <div class="color-swatch" style="background: #f97316;"></div>
+        <div>
+          <div class="color-name">برتقالي السرعة والتوريد</div>
+          <div class="color-hex">#F97316</div>
+        </div>
+      </div>
+      <div class="color-card">
+        <div class="color-swatch" style="background: #059669;"></div>
+        <div>
+          <div class="color-name">أخضر الأمان والتسليم</div>
+          <div class="color-hex">#059669</div>
+        </div>
+      </div>
+      <div class="color-card">
+        <div class="color-swatch" style="background: #1e293b;"></div>
+        <div>
+          <div class="color-name">رمادي كحلي معدني</div>
+          <div class="color-hex">#1E293B</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- بطاقات الشعارات -->
+    <div class="section-title">ملفات وصور الشعار المعتمدة</div>
+    <div class="assets-grid">
+
+      <!-- 1. الشعار الكامل - خلفية كحلية داكنة -->
+      <div class="asset-card">
+        <div class="preview-box bg-dark">
+          <img src="amanco-logo-dark-bg.png" alt="الشعار بخلفية كحلية داكنة" class="preview-img">
+        </div>
+        <div class="asset-info">
+          <div class="asset-title">اللوجو الكامل (خلفية كحلية داكنة)</div>
+          <div class="asset-desc">للبنرات الإعلانية، بوستات السوشيال ميديا، والموقع الإلكتروني بالنمط المظلم.</div>
+          <div class="asset-meta">
+            <span>PNG فائقة الدقة</span> • <span>2400 × 700 px</span>
+          </div>
+          <div class="asset-actions">
+            <a href="amanco-logo-dark-bg.png" download class="btn-download">تحميل PNG</a>
+            <a href="amanco-logo-dark.svg" download class="btn-download">تحميل SVG</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. الشعار الكامل - خلفية بيضاء -->
+      <div class="asset-card">
+        <div class="preview-box bg-white">
+          <img src="amanco-logo-white-bg.png" alt="الشعار بخلفية بيضاء" class="preview-img">
+        </div>
+        <div class="asset-info">
+          <div class="asset-title">اللوجو الكامل (خلفية بيضاء)</div>
+          <div class="asset-desc">للمطبوعات، الكروت الشخصية، البوالص المطبوعة A4، والفواتير الورقية.</div>
+          <div class="asset-meta">
+            <span>PNG نقية</span> • <span>2400 × 700 px</span>
+          </div>
+          <div class="asset-actions">
+            <a href="amanco-logo-white-bg.png" download class="btn-download">تحميل PNG</a>
+            <a href="amanco-logo-light.svg" download class="btn-download">تحميل SVG</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. الشعار الكامل - خلفية شفافة (نصوص داكنة) -->
+      <div class="asset-card">
+        <div class="preview-box bg-transparent-grid">
+          <img src="amanco-logo-transparent.png" alt="الشعار بخلفية شفافة" class="preview-img">
+        </div>
+        <div class="asset-info">
+          <div class="asset-title">اللوجو بخلفية شفافة (نصوص كحلية)</div>
+          <div class="asset-desc">لإدراجه فوق أي خلفية فاتحة أو مستندات Word و PDF وبرامج التصميم بدون خلفية.</div>
+          <div class="asset-meta">
+            <span>PNG شفاف</span> • <span>2400 × 700 px</span>
+          </div>
+          <div class="asset-actions">
+            <a href="amanco-logo-transparent.png" download class="btn-download">تحميل PNG شفاف</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. الشعار الكامل - خلفية شفافة (نصوص بيضاء) -->
+      <div class="asset-card">
+        <div class="preview-box bg-transparent-grid">
+          <img src="amanco-logo-transparent-white.png" alt="الشعار بخلفية شفافة أبيض" class="preview-img">
+        </div>
+        <div class="asset-info">
+          <div class="asset-title">اللوجو بخلفية شفافة (نصوص بيضاء)</div>
+          <div class="asset-desc">لإدراجه فوق الفيديوهات الترويجية، الصور الداكنة، وتصميمات التيشرتات والسيارات.</div>
+          <div class="asset-meta">
+            <span>PNG شفاف</span> • <span>2400 × 700 px</span>
+          </div>
+          <div class="asset-actions">
+            <a href="amanco-logo-transparent-white.png" download class="btn-download">تحميل PNG شفاف</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5. صورة البروفايل والأفاتار المربعة (كحلي فخم) -->
+      <div class="asset-card">
+        <div class="preview-box bg-dark">
+          <img src="amanco-avatar-square-dark.png" alt="أفاتار مربع كحلي" class="preview-img" style="max-height: 190px;">
+        </div>
+        <div class="asset-info">
+          <div class="asset-title">صورة البروفايل / أفاتار الحسابات (كحلي فخم)</div>
+          <div class="asset-desc">مخصصة لبروفايل واتساب بيزنس، فيسبوك، إنستجرام، وتطبيق الموبايل بنمط فخم وإضاءة خافتة.</div>
+          <div class="asset-meta">
+            <span>PNG مربعة</span> • <span>1200 × 1200 px</span>
+          </div>
+          <div class="asset-actions">
+            <a href="amanco-avatar-square-dark.png" download class="btn-download">تحميل صورة البروفايل</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- 6. صورة البروفايل المربعة (أبيض نقي) -->
+      <div class="asset-card">
+        <div class="preview-box bg-white">
+          <img src="amanco-avatar-square-white.png" alt="أفاتار مربع أبيض" class="preview-img" style="max-height: 190px;">
+        </div>
+        <div class="asset-info">
+          <div class="asset-title">صورة البروفايل / أفاتار الحسابات (أبيض نقي)</div>
+          <div class="asset-desc">صورة مربعة واضحة بنمط نهاري ساطع وخلفية بيضاء نقية.</div>
+          <div class="asset-meta">
+            <span>PNG مربعة</span> • <span>1200 × 1200 px</span>
+          </div>
+          <div class="asset-actions">
+            <a href="amanco-avatar-square-white.png" download class="btn-download">تحميل صورة البروفايل</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- 7. أيقونة الدرع بمقاس 1024x1024 شفافة -->
+      <div class="asset-card">
+        <div class="preview-box bg-transparent-grid">
+          <img src="amanco-shield-icon-1024.png" alt="أيقونة الدرع اللوجستي" class="preview-img" style="max-height: 180px;">
+        </div>
+        <div class="asset-info">
+          <div class="asset-title">أيقونة الدرع اللوجستي (Shield Icon)</div>
+          <div class="asset-desc">الرمز البصري للدرع مع صندوق الطرد وسهم السرعة وعلامة التسليم بخلفية شفافة كاملة.</div>
+          <div class="asset-meta">
+            <span>PNG شفاف عالي الدقة</span> • <span>1024 × 1024 px</span>
+          </div>
+          <div class="asset-actions">
+            <a href="amanco-shield-icon-1024.png" download class="btn-download">تحميل 1024px PNG</a>
+            <a href="amanco-shield-icon.svg" download class="btn-download">تحميل SVG Vector</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- 8. ملفات الفيكتور Vector SVG الأصلية -->
+      <div class="asset-card">
+        <div class="preview-box bg-dark" style="flex-direction: column; gap: 8px;">
+          <img src="amanco-shield-icon.svg" alt="ملفات الفيكتور" class="preview-img" style="max-height: 100px;">
+          <span style="font-size: 13px; color: #f97316; font-weight: 700;">Vector SVG (Infinite Scalability)</span>
+        </div>
+        <div class="asset-info">
+          <div class="asset-title">ملفات الفيكتور الأصلية (Vector SVG)</div>
+          <div class="asset-desc">للمطابع ووكالات الدعاية والإعلان والطباعة على بنرات الطرق والسيارات بدون فقدان أي دقة.</div>
+          <div class="asset-meta">
+            <span>SVG قابل للتحجيم اللانهائي</span>
+          </div>
+          <div class="asset-actions">
+            <a href="amanco-logo-dark.svg" download class="btn-download">SVG داكن</a>
+            <a href="amanco-logo-light.svg" download class="btn-download">SVG فاتح</a>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <footer>
+      جميع حقوق الهوية البصرية محفوظة لشركة <strong>أمانكو بلس للشحن والتوريد (AMANCO PLUS)</strong> © 2026<br>
+      القاهرة • الجيزة • القليوبية | للتواصل: 01274365996
+    </footer>
+  </div>
+
+</body>
+</html>

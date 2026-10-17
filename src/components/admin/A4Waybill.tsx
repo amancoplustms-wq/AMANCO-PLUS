@@ -50,7 +50,9 @@ export default function A4Waybill({ shipment, mode }: A4WaybillProps) {
 
   return (
     <div
-      className={`border-2 border-slate-900 bg-white text-slate-900 font-sans box-border overflow-hidden flex flex-col rounded-lg ${heightClass}`}
+      className={`border-2 border-slate-900 bg-white text-slate-900 font-sans box-border overflow-hidden flex flex-col ${
+        isQuarter ? 'rounded-md' : 'rounded-lg'
+      } ${heightClass}`}
       style={{
         printColorAdjust: 'exact',
         WebkitPrintColorAdjust: 'exact',
@@ -58,56 +60,64 @@ export default function A4Waybill({ shipment, mode }: A4WaybillProps) {
       dir="rtl"
     >
       {/* ==================================================================== */}
-      {/* الصف 1: الهيدر العلوي (قسمان فقط: اللوجو يميناً | الباركود يساراً) */}
+      {/* الصف 1: الهيدر العلوي (قسمان فقط: اللوجو يميناً | الباركود يساراً مع حماية كاملة من القص) */}
       {/* ==================================================================== */}
-      <div className="border-b-2 border-slate-900 px-2 sm:px-3 py-1 sm:py-1.5 flex items-center justify-between gap-1.5 bg-white shrink-0">
-        {/* اليمين: اللوجو واسم الشركة في سطرين متناسقين فقط بمحاذاة اليمين */}
-        <div className="flex items-center gap-2 shrink-0">
+      <div className={`border-b-2 border-slate-900 flex items-center justify-between bg-white shrink-0 ${
+        isQuarter ? 'px-2.5 py-1.5 gap-2' : 'px-3 py-1.5 sm:py-2 gap-3'
+      }`}>
+        {/* اليمين: اللوجو واسم الشركة في سطرين متناسقين بمحاذاة اليمين */}
+        <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
           <BrandLogo size={isQuarter ? 'sm' : 'md'} showText={false} className="shrink-0" />
-          <div className="flex flex-col items-start justify-center text-right shrink-0">
+          <div className="flex flex-col items-start justify-center text-right min-w-0">
             {/* السطر الأول: أمانكو بلس بارز وكبير */}
             <span className={`font-black text-slate-900 whitespace-nowrap leading-tight ${
-              isQuarter ? 'text-[13px]' : 'text-lg sm:text-xl'
+              isQuarter ? 'text-[12.5px]' : 'text-lg sm:text-xl'
             }`}>
               أمانكو <span className="text-[#f97316]">بلس</span>
             </span>
 
-            {/* السطر الثاني: AMANCO PLUS • للشحن والتوريد • خدمة العملاء */}
-            <div className={`font-bold text-slate-500 whitespace-nowrap flex items-center mt-0.5 leading-tight ${
-              isQuarter ? 'text-[8px] gap-1' : 'text-xs gap-1.5'
-            }`}>
-              <span className={`font-sans font-extrabold uppercase tracking-wider text-slate-800 ${
-                isQuarter ? 'text-[7.5px]' : 'text-[11px]'
-              }`}>
-                AMANCO <span className="text-[#f97316]">PLUS</span>
-              </span>
-              <span className="text-slate-300">•</span>
-              <span className="text-slate-700">للشحن والتوريد</span>
-              <span className="text-slate-300">•</span>
-              <span>خدمة العملاء: <span dir="ltr" className="font-black text-slate-900">01274365996</span></span>
-            </div>
+            {/* السطر الثاني: في وضع 4 بوالص نجعله مختصراً ذكياً لمنع أي ضغط على الباركود */}
+            {isQuarter ? (
+              <div className="font-bold text-slate-500 whitespace-nowrap flex items-center gap-1 mt-0.5 leading-tight text-[8px]">
+                <span className="font-sans font-extrabold uppercase tracking-wider text-slate-800 text-[7.5px]">
+                  AMANCO <span className="text-[#f97316]">PLUS</span>
+                </span>
+                <span className="text-slate-300">•</span>
+                <span>خدمة العملاء: <span dir="ltr" className="font-black text-slate-900">01274365996</span></span>
+              </div>
+            ) : (
+              <div className="font-bold text-slate-500 whitespace-nowrap flex items-center gap-1.5 mt-0.5 leading-tight text-xs">
+                <span className="font-sans font-extrabold uppercase tracking-wider text-slate-800 text-[11px]">
+                  AMANCO <span className="text-[#f97316]">PLUS</span>
+                </span>
+                <span className="text-slate-300">•</span>
+                <span className="text-slate-700">للشحن والتوريد</span>
+                <span className="text-slate-300">•</span>
+                <span>خدمة العملاء: <span dir="ltr" className="font-black text-slate-900">01274365996</span></span>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* اليسار: الباركود ورقم البوليصة وتاريخ الإصدار أسفله */}
-        <div className="text-center flex flex-col items-center shrink-0">
-          <div dir="ltr" className="flex justify-center overflow-hidden">
+        {/* اليسار: الباركود ورقم البوليصة وتاريخ الإصدار أسفله مع مساحة أمان وحماية من التآكل */}
+        <div className="text-center flex flex-col items-center justify-center shrink-0 pl-1 pr-0.5">
+          <div dir="ltr" className="flex justify-center items-center max-w-[115px] sm:max-w-[130px] [&>svg]:max-w-full [&>svg]:h-auto">
             <Barcode
               value={shipment.awb_number}
-              width={isQuarter ? 0.95 : 1.35}
-              height={isQuarter ? 18 : 22}
+              width={isQuarter ? 0.8 : 1.35}
+              height={isQuarter ? 20 : 24}
               displayValue={false}
-              margin={0}
+              margin={2}
               background="transparent"
             />
           </div>
-          <span className={`font-mono font-black text-slate-900 leading-tight mt-0.5 ${
-            isQuarter ? 'text-[10px]' : 'text-xs sm:text-sm'
+          <span className={`font-mono font-black text-slate-900 leading-tight tracking-wider mt-0.5 ${
+            isQuarter ? 'text-[9.5px]' : 'text-xs sm:text-sm'
           }`} dir="ltr">
             {shipment.awb_number}
           </span>
           <span className={`font-mono text-slate-500 font-bold leading-tight ${
-            isQuarter ? 'text-[8px]' : 'text-[10px]'
+            isQuarter ? 'text-[7.5px]' : 'text-[10px]'
           }`} dir="ltr">
             {new Date(shipment.created_at).toLocaleDateString('ar-EG')}
           </span>
