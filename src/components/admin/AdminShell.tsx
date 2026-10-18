@@ -20,6 +20,7 @@ import {
   ChevronLeft,
   Bell,
   ShieldCheck,
+  Loader2,
 } from 'lucide-react';
 
 interface AdminShellProps {
@@ -44,15 +45,42 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/admin/finance', label: 'الخزنة والتسويات', icon: Wallet },
 ];
 
+// ذاكرة مؤقتة في الـ Module Level لمنع تكرار طلبات Supabase عند كل تنقل
+let cachedEmail: string | null = null;
+let cachedLeadsCount: number | null = null;
+let lastLeadsFetchTime = 0;
+const LEADS_CACHE_TTL = 60 * 1000; // 60 ثانية
+
 export default function AdminShell({ userEmail, children }: AdminShellProps) {
   const pathname = usePathname();
   const router = useRouter();
+
+  // حالة التحديث اللحظي التفاؤلي للمسار النشط (0ms Lag)
+  const [pendingPath, setPendingPath] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [unreadLeadsCount, setUnreadLeadsCount] = useState<number>(0);
+  const [unreadLeadsCount, setUnreadLeadsCount] = useState<number>(() => cachedLeadsCount ?? 0);
   const [loggingOut, setLoggingOut] = useState(false);
 
-  // جلب عدد طلبات التجار غير المتواصل معهم لعرض إشعار في السايدبار
+  // تحديث كاش الإيميل في الذاكرة
+  if (userEmail && (!cachedEmail || cachedEmail !== userEmail)) {
+    cachedEmail = userEmail;
+  }
+  const displayEmail = userEmail || cachedEmail || '';
+
+  // تصفير حالة التحميل اللحظية عند اكتمال انتقال الصفحة
   useEffect(() => {
+    setPendingPath(null);
+    setMobileMenuOpen(false);
+  }, [pathname]);
+
+  // جلب عدد طلبات التجار غير المتواصل معهم مع كاش 60 ثانية
+  useEffect(() => {
+    const now = Date.now();
+    if (cachedLeadsCount !== null && now - lastLeadsFetchTime < LEADS_CACHE_TTL) {
+      setUnreadLeadsCount(cachedLeadsCount);
+      return;
+    }
+
     const supabase = createClient();
     async function fetchLeadsBadge() {
       try {
@@ -60,17 +88,16 @@ export default function AdminShell({ userEmail, children }: AdminShellProps) {
           .from('merchant_leads')
           .select('*', { count: 'exact', head: true })
           .eq('is_contacted', false);
-        if (count !== null) setUnreadLeadsCount(count);
+        if (count !== null) {
+          cachedLeadsCount = count;
+          lastLeadsFetchTime = Date.now();
+          setUnreadLeadsCount(count);
+        }
       } catch (err) {
         console.error('Failed to fetch leads count:', err);
       }
     }
     fetchLeadsBadge();
-  }, [pathname]);
-
-  // إغلاق قائمة الموبايل عند تغيير الصفحة
-  useEffect(() => {
-    setMobileMenuOpen(false);
   }, [pathname]);
 
   const handleSignOut = async () => {
@@ -88,10 +115,17 @@ export default function AdminShell({ userEmail, children }: AdminShellProps) {
   };
 
   const isLinkActive = (href: string) => {
+    const target = pendingPath ?? pathname;
     if (href === '/admin') {
-      return pathname === '/admin';
+      return target === '/admin';
     }
-    return pathname.startsWith(href);
+    return target.startsWith(href);
+  };
+
+  const isLinkPending = (href: string) => {
+    if (!pendingPath) return false;
+    if (href === '/admin') return pendingPath === '/admin' && pathname !== '/admin';
+    return pendingPath.startsWith(href) && !pathname.startsWith(href);
   };
 
   return (
@@ -102,7 +136,7 @@ export default function AdminShell({ userEmail, children }: AdminShellProps) {
       <aside className="hidden lg:flex lg:flex-col lg:w-72 bg-slate-900 border-l border-slate-800 text-white shrink-0 sticky top-0 h-screen z-30 print:hidden">
         {/* ترويسة السايدبار والشعار */}
         <div className="px-5 py-4 border-b border-slate-800/80 flex items-center justify-between gap-2">
-          <Link href="/admin" className="flex items-center group">
+          <Link href="/admin" prefetch={true} className="flex items-center group">
             <BrandLogo size="sm" variant="dark" />
           </Link>
           <span className="text-[10px] bg-brand-orange/20 text-brand-orange font-bold px-2 py-0.5 rounded-full border border-brand-orange/30 shrink-0">
@@ -118,6 +152,7 @@ export default function AdminShell({ userEmail, children }: AdminShellProps) {
 
           {NAV_ITEMS.map((item) => {
             const active = isLinkActive(item.href);
+            const pending = isLinkPending(item.href);
             const Icon = item.icon;
             const badge = item.badgeKey === 'leads' && unreadLeadsCount > 0 ? unreadLeadsCount : null;
 
@@ -125,7 +160,13 @@ export default function AdminShell({ userEmail, children }: AdminShellProps) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center justify-between px-3.5 py-3 rounded-xl text-sm font-semibold transition-all duration-200 group ${
+                prefetch={true}
+                onClick={() => {
+                  if (pathname !== item.href) {
+                    setPendingPath(item.href);
+                  }
+                }}
+                className={`flex items-center justify-between px-3.5 py-3 rounded-xl text-sm font-semibold transition-all duration-150 group cursor-pointer ${
                   active
                     ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30 font-bold'
                     : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
@@ -134,7 +175,7 @@ export default function AdminShell({ userEmail, children }: AdminShellProps) {
                 <div className="flex items-center gap-3">
                   <Icon
                     size={19}
-                    className={`transition-transform duration-200 group-hover:scale-110 ${
+                    className={`transition-transform duration-150 group-hover:scale-110 ${
                       active ? 'text-white' : 'text-slate-400 group-hover:text-brand-orange'
                     }`}
                   />
@@ -142,12 +183,18 @@ export default function AdminShell({ userEmail, children }: AdminShellProps) {
                 </div>
 
                 <div className="flex items-center gap-1.5">
-                  {badge !== null && (
+                  {pending && (
+                    <span className="flex items-center gap-1 text-[11px] font-bold text-blue-200 bg-blue-700/80 px-2 py-0.5 rounded-full animate-pulse">
+                      <Loader2 size={12} className="animate-spin" />
+                      <span>جاري...</span>
+                    </span>
+                  )}
+                  {badge !== null && !pending && (
                     <span className="bg-brand-orange text-white text-[11px] font-bold px-2 py-0.5 rounded-full shadow-sm">
                       {badge} جديد
                     </span>
                   )}
-                  {active && <ChevronLeft size={16} className="text-white/80" />}
+                  {active && !pending && <ChevronLeft size={16} className="text-white/80" />}
                 </div>
               </Link>
             );
@@ -180,7 +227,7 @@ export default function AdminShell({ userEmail, children }: AdminShellProps) {
             <div className="flex-1 min-w-0">
               <p className="text-xs font-bold text-white truncate">المدير العام</p>
               <p className="text-[11px] text-slate-400 truncate" dir="ltr">
-                {userEmail}
+                {displayEmail}
               </p>
             </div>
           </div>
@@ -201,7 +248,7 @@ export default function AdminShell({ userEmail, children }: AdminShellProps) {
       {/* الهيدر العلوي للموبايل والقائمة المنسدلة (Mobile Header & Drawer) */}
       {/* ==================================================================== */}
       <div className="lg:hidden bg-slate-900 border-b border-slate-800 text-white p-4 sticky top-0 z-40 flex items-center justify-between print:hidden">
-        <Link href="/admin" className="flex items-center gap-2">
+        <Link href="/admin" prefetch={true} className="flex items-center gap-2">
           <BrandLogo size="sm" variant="dark" />
         </Link>
 
@@ -253,6 +300,7 @@ export default function AdminShell({ userEmail, children }: AdminShellProps) {
           <nav className="mt-6 space-y-1.5">
             {NAV_ITEMS.map((item) => {
               const active = isLinkActive(item.href);
+              const pending = isLinkPending(item.href);
               const Icon = item.icon;
               const badge = item.badgeKey === 'leads' && unreadLeadsCount > 0 ? unreadLeadsCount : null;
 
@@ -260,6 +308,13 @@ export default function AdminShell({ userEmail, children }: AdminShellProps) {
                 <Link
                   key={item.href}
                   href={item.href}
+                  prefetch={true}
+                  onClick={() => {
+                    if (pathname !== item.href) {
+                      setPendingPath(item.href);
+                    }
+                    setMobileMenuOpen(false);
+                  }}
                   className={`flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
                     active
                       ? 'bg-blue-600 text-white shadow-md'
@@ -270,11 +325,18 @@ export default function AdminShell({ userEmail, children }: AdminShellProps) {
                     <Icon size={18} />
                     <span>{item.label}</span>
                   </div>
-                  {badge !== null && (
-                    <span className="bg-brand-orange text-white text-[11px] font-bold px-2 py-0.5 rounded-full">
-                      {badge}
-                    </span>
-                  )}
+                  <div className="flex items-center gap-1.5">
+                    {pending && (
+                      <span className="flex items-center gap-1 text-[10px] font-bold text-blue-200 bg-blue-700 px-2 py-0.5 rounded-full animate-pulse">
+                        <Loader2 size={11} className="animate-spin" />
+                      </span>
+                    )}
+                    {badge !== null && !pending && (
+                      <span className="bg-brand-orange text-white text-[11px] font-bold px-2 py-0.5 rounded-full">
+                        {badge}
+                      </span>
+                    )}
+                  </div>
                 </Link>
               );
             })}
@@ -285,7 +347,7 @@ export default function AdminShell({ userEmail, children }: AdminShellProps) {
           <div className="text-xs text-slate-400">
             <p className="font-bold text-white mb-0.5">المدير العام</p>
             <p dir="ltr" className="truncate text-[11px]">
-              {userEmail}
+              {displayEmail}
             </p>
           </div>
 

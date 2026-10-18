@@ -7,6 +7,27 @@ import { NextResponse, type NextRequest } from 'next/server';
  * - يحول المستخدمين غير المسجلين إلى /login.
  */
 export async function middleware(request: NextRequest) {
+  const allCookies = request.cookies.getAll();
+  const hasAuthToken = allCookies.some(
+    (c) => c.name.startsWith('sb-') && c.name.includes('-auth-token'),
+  );
+
+  const isPrefetch =
+    request.headers.get('next-router-prefetch') === '1' ||
+    request.headers.get('purpose') === 'prefetch';
+
+  // 1. إذا لم يكن هناك أي كوكي جلسة لمسار /admin، حوله مباشرة لـ /login دون استعلام خارجي بطيء
+  if (!hasAuthToken && request.nextUrl.pathname.startsWith('/admin')) {
+    const loginUrl = request.nextUrl.clone();
+    loginUrl.pathname = '/login';
+    return NextResponse.redirect(loginUrl);
+  }
+
+  // 2. إذا كان الطلب Prefetch والكوكي موجودة، اسمح بالطلب فوراً بـ 0ms تأخير
+  if (isPrefetch && hasAuthToken && request.nextUrl.pathname.startsWith('/admin')) {
+    return NextResponse.next({ request });
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
