@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import { createClient } from '@/lib/supabase/client';
 import {
   buildWhatsAppLink,
@@ -25,10 +26,16 @@ import {
   Courier,
 } from '@/types/database';
 import ShipmentFormModal from '@/components/admin/ShipmentFormModal';
-import BulkUploadModal from '@/components/admin/BulkUploadModal';
 import UpdateStatusModal from '@/components/admin/UpdateStatusModal';
-import PrintShipmentsModal from '@/components/admin/PrintShipmentsModal';
 import { WaybillShipmentData } from '@/components/admin/A4Waybill';
+
+// استيراد ديناميكي كسول للنوافذ الثقيلة (XLSX و React-Barcode) لتقليل First Load JS
+const BulkUploadModal = dynamic(() => import('@/components/admin/BulkUploadModal'), {
+  ssr: false,
+});
+const PrintShipmentsModal = dynamic(() => import('@/components/admin/PrintShipmentsModal'), {
+  ssr: false,
+});
 import {
   Package,
   Plus,
@@ -335,118 +342,161 @@ export default function AdminShipmentsPage() {
     return isShipmentUnclosed(s) && isDateBeforeToday(s.created_at || s.updated_at);
   };
 
-  // احتساب النطاق الزمني المحدد
-  const dateRange = getDateRange(dateFilter, customStartDate, customEndDate);
-
-  // شحنات الفترة المحددة + الحسابات المفتوحة التي لم تُقفل من أيام سابقة
-  const dateFilteredShipments = shipments.filter((s) => {
-    // عند اختيار كل الأوقات تظهر جميع الشحنات
-    if (dateFilter === 'all') return true;
-
-    // إن كانت ضمن نطاق التاريخ المحدد
-    const inRange = isDateInRange(s.created_at, dateRange) || isDateInRange(s.updated_at, dateRange);
-    if (inRange) return true;
-
-    // قاعدة الحسابات المفتوحة: تظل ظاهرة دائماً ولا تختفي عند اختيار "حركة اليوم" إذا لم تُقفل
-    return isShipmentUnclosed(s);
-  });
-
-  const totalOverdueCount = shipments.filter(isShipmentOverdue).length;
-
-  // أعداد التبويبات بحسب الفترة المحددة
-  const activeCount = dateFilteredShipments.filter(
-    (s) => !TERMINAL_STATUSES.includes(s.status),
-  ).length;
-  const pendingSettlementCount = dateFilteredShipments.filter(
-    (s) => TERMINAL_STATUSES.includes(s.status) && s.settlement_id === null,
-  ).length;
-  const settledCount = dateFilteredShipments.filter((s) => s.settlement_id !== null).length;
-  const totalCount = dateFilteredShipments.length;
-
-  // فلترة الشحنات المعروضة
-  const filteredShipments = dateFilteredShipments.filter((s) => {
-    const q = searchQuery.toLowerCase().trim();
-    const brandName = (s.merchants?.brand_name || '').toLowerCase();
-    const recipientName = (s.recipient_name || '').toLowerCase();
-    const awb = (s.awb_number || '').toLowerCase();
-    const phone = s.recipient_phone || '';
-
-    const matchesSearch =
-      !q ||
-      awb.includes(q) ||
-      recipientName.includes(q) ||
-      phone.includes(q) ||
-      brandName.includes(q);
-
-    // فلترة التبويب المحدد
-    const matchesTab = (() => {
-      if (activeTab === 'ACTIVE') return !TERMINAL_STATUSES.includes(s.status);
-      if (activeTab === 'PENDING_SETTLEMENT')
-        return TERMINAL_STATUSES.includes(s.status) && s.settlement_id === null;
-      if (activeTab === 'SETTLED') return s.settlement_id !== null;
-      return true;
-    })();
-
-    const matchesStatus = filterStatus === 'ALL' || s.status === filterStatus;
-    const matchesMerchant = filterMerchant === 'ALL' || s.merchant_id === filterMerchant;
-    const matchesCourier = filterCourier === 'ALL' || s.courier_id === filterCourier;
-    const matchesZone = filterZone === 'ALL' || s.zone_id === filterZone;
-    const matchesType = filterType === 'ALL' || s.shipment_type === filterType;
-    const matchesOverdue = !filterOverdueOnly || isShipmentOverdue(s);
-
-    return (
-      matchesSearch &&
-      matchesTab &&
-      matchesStatus &&
-      matchesMerchant &&
-      matchesCourier &&
-      matchesZone &&
-      matchesType &&
-      matchesOverdue
-    );
-  });
-
-  // حساب ملخص الأرقام المعروضة الدقيقة (حسب الحالة والتسوية)
-  const totalDisplayShipping = filteredShipments.reduce(
-    (sum, s) => sum + (Number(s.shipping_fee) || 0),
-    0,
+  // احتساب النطاق الزمني المحدد (Memoized)
+  const dateRange = useMemo(
+    () => getDateRange(dateFilter, customStartDate, customEndDate),
+    [dateFilter, customStartDate, customEndDate],
   );
 
-  let pendingVaultCash = 0; // كاش بيد المناديب لم يورد بعد للخزنة
-  let settledVaultCash = 0; // كاش تم توريده فعلياً للخزنة
-  let unsettledMerchantNet = 0; // مستحقات التجار للشحنات غير المسواة (settlement_id === null)
-  let settledMerchantNet = 0; // مستحقات الشحنات المسواة سابقاً (settlement_id !== null)
+  // شحنات الفترة المحددة + الحسابات المفتوحة التي لم تُقفل من أيام سابقة (Memoized)
+  const dateFilteredShipments = useMemo(() => {
+    return shipments.filter((s) => {
+      // عند اختيار كل الأوقات تظهر جميع الشحنات
+      if (dateFilter === 'all') return true;
 
-  filteredShipments.forEach((s) => {
-    const fin = calculateShipmentFinancials({
-      shipmentType: s.shipment_type,
-      status: s.status,
-      expectedCod: Number(s.expected_cod) || 0,
-      shippingFee: Number(s.shipping_fee) || 0,
-      zoneCourierCommission: Number(s.zones?.courier_commission) || 0,
-      courierCommissionOverride: Number(s.courier_commission) || undefined,
-      returnFeeBearer: s.return_fee_bearer || 'NONE',
-      partialCollectedCash: Number(s.collected_cash) || 0,
+      // إن كانت ضمن نطاق التاريخ المحدد
+      const inRange = isDateInRange(s.created_at, dateRange) || isDateInRange(s.updated_at, dateRange);
+      if (inRange) return true;
+
+      // قاعدة الحسابات المفتوحة: تظل ظاهرة دائماً ولا تختفي عند اختيار "حركة اليوم" إذا لم تُقفل
+      return isShipmentUnclosed(s);
+    });
+  }, [shipments, dateFilter, dateRange]);
+
+  const totalOverdueCount = useMemo(
+    () => shipments.filter(isShipmentOverdue).length,
+    [shipments],
+  );
+
+  // أعداد التبويبات بحسب الفترة المحددة (Memoized)
+  const { activeCount, pendingSettlementCount, settledCount, totalCount } = useMemo(() => {
+    let act = 0;
+    let pend = 0;
+    let setld = 0;
+    dateFilteredShipments.forEach((s) => {
+      if (!TERMINAL_STATUSES.includes(s.status)) act++;
+      else if (s.settlement_id === null) pend++;
+      else setld++;
+    });
+    return {
+      activeCount: act,
+      pendingSettlementCount: pend,
+      settledCount: setld,
+      totalCount: dateFilteredShipments.length,
+    };
+  }, [dateFilteredShipments]);
+
+  // فلترة الشحنات المعروضة (Memoized)
+  const filteredShipments = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+
+    return dateFilteredShipments.filter((s) => {
+      const brandName = (s.merchants?.brand_name || '').toLowerCase();
+      const recipientName = (s.recipient_name || '').toLowerCase();
+      const awb = (s.awb_number || '').toLowerCase();
+      const phone = s.recipient_phone || '';
+
+      const matchesSearch =
+        !q ||
+        awb.includes(q) ||
+        recipientName.includes(q) ||
+        phone.includes(q) ||
+        brandName.includes(q);
+
+      // فلترة التبويب المحدد
+      const matchesTab = (() => {
+        if (activeTab === 'ACTIVE') return !TERMINAL_STATUSES.includes(s.status);
+        if (activeTab === 'PENDING_SETTLEMENT')
+          return TERMINAL_STATUSES.includes(s.status) && s.settlement_id === null;
+        if (activeTab === 'SETTLED') return s.settlement_id !== null;
+        return true;
+      })();
+
+      const matchesStatus = filterStatus === 'ALL' || s.status === filterStatus;
+      const matchesMerchant = filterMerchant === 'ALL' || s.merchant_id === filterMerchant;
+      const matchesCourier = filterCourier === 'ALL' || s.courier_id === filterCourier;
+      const matchesZone = filterZone === 'ALL' || s.zone_id === filterZone;
+      const matchesType = filterType === 'ALL' || s.shipment_type === filterType;
+      const matchesOverdue = !filterOverdueOnly || isShipmentOverdue(s);
+
+      return (
+        matchesSearch &&
+        matchesTab &&
+        matchesStatus &&
+        matchesMerchant &&
+        matchesCourier &&
+        matchesZone &&
+        matchesType &&
+        matchesOverdue
+      );
+    });
+  }, [
+    dateFilteredShipments,
+    searchQuery,
+    activeTab,
+    filterStatus,
+    filterMerchant,
+    filterCourier,
+    filterZone,
+    filterType,
+    filterOverdueOnly,
+  ]);
+
+  // حساب ملخص الأرقام المعروضة الدقيقة (Memoized)
+  const {
+    totalDisplayShipping,
+    pendingVaultCash,
+    settledVaultCash,
+    unsettledMerchantNet,
+    settledMerchantNet,
+  } = useMemo(() => {
+    let shipping = 0;
+    let pendingVault = 0; // كاش بيد المناديب لم يورد بعد للخزنة
+    let settledVault = 0; // كاش تم توريده فعلياً للخزنة
+    let unsettledNet = 0; // مستحقات التجار للشحنات غير المسواة (settlement_id === null)
+    let settledNet = 0; // مستحقات الشحنات المسواة سابقاً (settlement_id !== null)
+
+    filteredShipments.forEach((s) => {
+      shipping += Number(s.shipping_fee) || 0;
+
+      const fin = calculateShipmentFinancials({
+        shipmentType: s.shipment_type,
+        status: s.status,
+        expectedCod: Number(s.expected_cod) || 0,
+        shippingFee: Number(s.shipping_fee) || 0,
+        zoneCourierCommission: Number(s.zones?.courier_commission) || 0,
+        courierCommissionOverride: Number(s.courier_commission) || undefined,
+        returnFeeBearer: s.return_fee_bearer || 'NONE',
+        partialCollectedCash: Number(s.collected_cash) || 0,
+      });
+
+      const net = Number(s.merchant_net_amount) !== 0 ? Number(s.merchant_net_amount) : fin.merchantNetAmount;
+      const cash = Number(s.collected_cash) > 0 ? Number(s.collected_cash) : fin.collectedCash;
+
+      if (s.is_courier_cash_settled) {
+        settledVault += cash;
+      } else {
+        pendingVault += cash;
+      }
+
+      const isTerminal = TERMINAL_STATUSES.includes(s.status);
+      if (isTerminal) {
+        if (s.settlement_id) {
+          settledNet += net;
+        } else {
+          unsettledNet += net;
+        }
+      }
     });
 
-    const net = Number(s.merchant_net_amount) !== 0 ? Number(s.merchant_net_amount) : fin.merchantNetAmount;
-    const cash = Number(s.collected_cash) > 0 ? Number(s.collected_cash) : fin.collectedCash;
-
-    if (s.is_courier_cash_settled) {
-      settledVaultCash += cash;
-    } else {
-      pendingVaultCash += cash;
-    }
-
-    const isTerminal = TERMINAL_STATUSES.includes(s.status);
-    if (isTerminal) {
-      if (s.settlement_id) {
-        settledMerchantNet += net;
-      } else {
-        unsettledMerchantNet += net;
-      }
-    }
-  });
+    return {
+      totalDisplayShipping: shipping,
+      pendingVaultCash: pendingVault,
+      settledVaultCash: settledVault,
+      unsettledMerchantNet: unsettledNet,
+      settledMerchantNet: settledNet,
+    };
+  }, [filteredShipments]);
 
   const getStatusBadge = (status: ShipmentStatus) => {
     switch (status) {

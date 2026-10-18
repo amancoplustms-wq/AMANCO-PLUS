@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { buildWhatsAppLink, buildTelLink } from '@/modules/finance/calculator';
@@ -177,26 +177,39 @@ export default function AdminLeadsPage() {
     }
   };
 
-  // فلترة الطلبات
-  const filteredLeads = leads.filter((lead) => {
-    const q = searchQuery.toLowerCase();
-    const matchesSearch =
-      lead.contact_name.toLowerCase().includes(q) ||
-      lead.brand_name.toLowerCase().includes(q) ||
-      lead.phone.includes(q) ||
-      lead.governorate.toLowerCase().includes(q);
+  // فلترة الطلبات (Memoized)
+  const filteredLeads = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+    return leads.filter((lead) => {
+      const matchesSearch =
+        !q ||
+        lead.contact_name.toLowerCase().includes(q) ||
+        lead.brand_name.toLowerCase().includes(q) ||
+        lead.phone.includes(q) ||
+        lead.governorate.toLowerCase().includes(q);
 
-    const matchesStatus =
-      filterStatus === 'ALL' ||
-      (filterStatus === 'PENDING' && !lead.is_contacted) ||
-      (filterStatus === 'CONTACTED' && lead.is_contacted);
+      const matchesStatus =
+        filterStatus === 'ALL' ||
+        (filterStatus === 'PENDING' && !lead.is_contacted) ||
+        (filterStatus === 'CONTACTED' && lead.is_contacted);
 
-    return matchesSearch && matchesStatus;
-  });
+      return matchesSearch && matchesStatus;
+    });
+  }, [leads, searchQuery, filterStatus]);
 
-  const totalLeads = leads.length;
-  const pendingLeads = leads.filter((l) => !l.is_contacted).length;
-  const contactedLeads = leads.filter((l) => l.is_contacted).length;
+  const { totalLeads, pendingLeads, contactedLeads } = useMemo(() => {
+    let pending = 0;
+    let contacted = 0;
+    leads.forEach((l) => {
+      if (l.is_contacted) contacted++;
+      else pending++;
+    });
+    return {
+      totalLeads: leads.length,
+      pendingLeads: pending,
+      contactedLeads: contacted,
+    };
+  }, [leads]);
 
   return (
     <div className="space-y-6">

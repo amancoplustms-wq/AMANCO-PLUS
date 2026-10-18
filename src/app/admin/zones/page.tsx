@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { formatCurrency } from '@/modules/finance/calculator';
 import type { Zone, Governorate, ZoneInsert, ZoneUpdate } from '@/types/database';
@@ -177,26 +177,39 @@ export default function AdminZonesPage() {
     }
   };
 
-  // فلترة المناطق
-  const filteredZones = zones.filter((zone) => {
-    const matchesSearch =
-      zone.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      zone.governorate.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesGov = selectedGov === 'ALL' || zone.governorate === selectedGov;
-    return matchesSearch && matchesGov;
-  });
+  // فلترة المناطق (Memoized)
+  const filteredZones = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+    return zones.filter((zone) => {
+      const matchesSearch =
+        !q ||
+        zone.name.toLowerCase().includes(q) ||
+        zone.governorate.toLowerCase().includes(q);
+      const matchesGov = selectedGov === 'ALL' || zone.governorate === selectedGov;
+      return matchesSearch && matchesGov;
+    });
+  }, [zones, searchQuery, selectedGov]);
 
-  // حساب الإحصائيات السريعة
-  const totalZones = zones.length;
-  const activeZones = zones.filter((z) => z.is_active).length;
-  const avgShipping =
-    totalZones > 0
-      ? zones.reduce((acc, z) => acc + Number(z.base_shipping_fee), 0) / totalZones
-      : 0;
-  const avgCommission =
-    totalZones > 0
-      ? zones.reduce((acc, z) => acc + Number(z.courier_commission), 0) / totalZones
-      : 0;
+  // حساب الإحصائيات السريعة (Memoized)
+  const { totalZones, activeZones, avgShipping, avgCommission } = useMemo(() => {
+    const total = zones.length;
+    let active = 0;
+    let totalShipping = 0;
+    let totalComm = 0;
+
+    zones.forEach((z) => {
+      if (z.is_active) active++;
+      totalShipping += Number(z.base_shipping_fee) || 0;
+      totalComm += Number(z.courier_commission) || 0;
+    });
+
+    return {
+      totalZones: total,
+      activeZones: active,
+      avgShipping: total > 0 ? totalShipping / total : 0,
+      avgCommission: total > 0 ? totalComm / total : 0,
+    };
+  }, [zones]);
 
   return (
     <div className="space-y-6">

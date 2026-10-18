@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import {
   buildWhatsAppLink,
@@ -364,25 +364,32 @@ export default function AdminMerchantsPage() {
     }
   };
 
-  // فلترة التجار
-  const filteredMerchants = merchants.filter((m) => {
-    const q = searchQuery.toLowerCase();
-    const matchesSearch =
-      m.name.toLowerCase().includes(q) ||
-      m.brand_name.toLowerCase().includes(q) ||
-      m.phone.includes(q) ||
-      (m.pickup_address && m.pickup_address.toLowerCase().includes(q));
+  // فلترة التجار (Memoized)
+  const filteredMerchants = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+    return merchants.filter((m) => {
+      const matchesSearch =
+        !q ||
+        m.name.toLowerCase().includes(q) ||
+        m.brand_name.toLowerCase().includes(q) ||
+        m.phone.includes(q) ||
+        (m.pickup_address && m.pickup_address.toLowerCase().includes(q));
 
-    const matchesVip =
-      vipFilter === 'ALL' ||
-      (vipFilter === 'VIP' && m.is_vip) ||
-      (vipFilter === 'REGULAR' && !m.is_vip);
+      const matchesVip =
+        vipFilter === 'ALL' ||
+        (vipFilter === 'VIP' && m.is_vip) ||
+        (vipFilter === 'REGULAR' && !m.is_vip);
 
-    return matchesSearch && matchesVip;
-  });
+      return matchesSearch && matchesVip;
+    });
+  }, [merchants, searchQuery, vipFilter]);
 
-  const totalMerchants = merchants.length;
-  const vipCount = merchants.filter((m) => m.is_vip).length;
+  const { totalMerchants, vipCount } = useMemo(() => {
+    return {
+      totalMerchants: merchants.length,
+      vipCount: merchants.filter((m) => m.is_vip).length,
+    };
+  }, [merchants]);
 
   return (
     <div className="space-y-6">

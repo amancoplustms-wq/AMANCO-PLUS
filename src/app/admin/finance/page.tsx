@@ -28,7 +28,13 @@ import {
   Courier,
   Shipment,
 } from '@/types/database';
-import PrintSettlementModal from '@/components/admin/PrintSettlementModal';
+import dynamic from 'next/dynamic';
+
+// استيراد ديناميكي كسول لنافذة طباعة كشوف التسوية لتقليل First Load JS
+const PrintSettlementModal = dynamic(
+  () => import('@/components/admin/PrintSettlementModal'),
+  { ssr: false },
+);
 import {
   Wallet,
   Banknote,
@@ -515,20 +521,47 @@ export default function AdminFinancePage() {
       const netAmount = isSettleBoth ? totalCash - totalComm : totalCash;
 
       if (isSettleBoth) {
+        const standardIds: string[] = [];
+        const overrideShipments: ExtendedShipmentWithZone[] = [];
+
         for (const s of targetShipments) {
           const effComm = getShipmentCommission(s);
-          const updatePayload: {
-            is_courier_cash_settled: boolean;
-            is_courier_commission_settled: boolean;
-            courier_commission?: number;
-          } = {
-            is_courier_cash_settled: true,
-            is_courier_commission_settled: true,
-          };
           if (Number(s.courier_commission) === 0 && effComm > 0) {
-            updatePayload.courier_commission = effComm;
+            overrideShipments.push(s);
+          } else {
+            standardIds.push(s.id);
           }
-          await supabase.from('shipments').update(updatePayload).eq('id', s.id);
+        }
+
+        // 1. تحديث جماعي فوري دفعة واحدة للشحنات ذات العمولة المحددة (Batch Update)
+        if (standardIds.length > 0) {
+          const { error: batchErr } = await supabase
+            .from('shipments')
+            .update({
+              is_courier_cash_settled: true,
+              is_courier_commission_settled: true,
+            })
+            .in('id', standardIds);
+          if (batchErr) throw batchErr;
+        }
+
+        // 2. تحديث متوازٍ بالكامل عبر Promise.all للشحنات التي تحتاج تسجيل العمولة
+        if (overrideShipments.length > 0) {
+          const updateResults = await Promise.all(
+            overrideShipments.map((s) =>
+              supabase
+                .from('shipments')
+                .update({
+                  is_courier_cash_settled: true,
+                  is_courier_commission_settled: true,
+                  courier_commission: getShipmentCommission(s),
+                })
+                .eq('id', s.id),
+            ),
+          );
+          for (const res of updateResults) {
+            if (res.error) throw res.error;
+          }
         }
       } else {
         const { error } = await supabase
@@ -586,18 +619,43 @@ export default function AdminFinancePage() {
         0,
       );
 
+      const standardIds: string[] = [];
+      const overrideShipments: ExtendedShipmentWithZone[] = [];
+
       for (const s of targetShipments) {
         const effComm = getShipmentCommission(s);
-        const updatePayload: {
-          is_courier_commission_settled: boolean;
-          courier_commission?: number;
-        } = {
-          is_courier_commission_settled: true,
-        };
         if (Number(s.courier_commission) === 0 && effComm > 0) {
-          updatePayload.courier_commission = effComm;
+          overrideShipments.push(s);
+        } else {
+          standardIds.push(s.id);
         }
-        await supabase.from('shipments').update(updatePayload).eq('id', s.id);
+      }
+
+      // 1. تحديث جماعي فوري دفعة واحدة للشحنات القياسية (Batch Update)
+      if (standardIds.length > 0) {
+        const { error: batchErr } = await supabase
+          .from('shipments')
+          .update({ is_courier_commission_settled: true })
+          .in('id', standardIds);
+        if (batchErr) throw batchErr;
+      }
+
+      // 2. تحديث متوازٍ بالكامل عبر Promise.all للشحنات التي تحتاج تسجيل العمولة
+      if (overrideShipments.length > 0) {
+        const updateResults = await Promise.all(
+          overrideShipments.map((s) =>
+            supabase
+              .from('shipments')
+              .update({
+                is_courier_commission_settled: true,
+                courier_commission: getShipmentCommission(s),
+              })
+              .eq('id', s.id),
+          ),
+        );
+        for (const res of updateResults) {
+          if (res.error) throw res.error;
+        }
       }
 
       // توثيق وحفظ سجل في جدول courier_settlements
@@ -725,6 +783,49 @@ export default function AdminFinancePage() {
       return matchesSearch && matchesMethod && matchesDate;
     });
   }, [rawSettlements, archiveSearch, archivePaymentFilter, dateRange]);
+
+  // احتساب ملخص الشحنات المحددة لنافذة توريد عهدة المندوب (Memoized)
+  const handoverModalStats = useMemo(() => {
+    if (!selectedCourierForHandover) {
+      return { checkedCash: 0, checkedCommission: 0, netToReceive: 0 };
+    }
+    const checkedShipments = selectedCourierForHandover.shipments.filter((s) =>
+      selectedHandoverShipmentIds.has(s.id),
+    );
+    const checkedCash = checkedShipments.reduce(
+      (sum, s) => sum + (Number(s.collected_cash) || 0),
+      0,
+    );
+    const checkedCommission = checkedShipments.reduce(
+      (sum, s) => sum + getShipmentCommission(s),
+      0,
+    );
+    const netToReceive = Math.max(0, checkedCash - checkedCommission);
+    return { checkedCash, checkedCommission, netToReceive };
+  }, [selectedCourierForHandover, selectedHandoverShipmentIds]);
+
+  // احتساب ملخص الشحنات المحددة لنافذة كشف تسوية التاجر (Memoized)
+  const settlementModalStats = useMemo(() => {
+    if (!selectedMerchantForSettlement) {
+      return { curCod: 0, curShipping: 0, curNet: 0 };
+    }
+    const checkedShipments = selectedMerchantForSettlement.shipments.filter((s) =>
+      selectedSettlementShipmentIds.has(s.id),
+    );
+    const curCod = checkedShipments.reduce(
+      (sum, s) => sum + (Number(s.collected_cash) || 0),
+      0,
+    );
+    const curShipping = checkedShipments.reduce(
+      (sum, s) => sum + (Number(s.shipping_fee) || 0),
+      0,
+    );
+    const curNet = checkedShipments.reduce(
+      (sum, s) => sum + (Number(s.merchant_net_amount) || 0),
+      0,
+    );
+    return { curCod, curShipping, curNet };
+  }, [selectedMerchantForSettlement, selectedSettlementShipmentIds]);
 
   return (
     <div className="space-y-6">
@@ -1625,18 +1726,7 @@ export default function AdminFinancePage() {
             </div>
 
             {(() => {
-              const checkedShipments = selectedCourierForHandover.shipments.filter((s) =>
-                selectedHandoverShipmentIds.has(s.id),
-              );
-              const checkedCash = checkedShipments.reduce(
-                (sum, s) => sum + (Number(s.collected_cash) || 0),
-                0,
-              );
-              const checkedCommission = checkedShipments.reduce(
-                (sum, s) => sum + getShipmentCommission(s),
-                0,
-              );
-              const netToReceive = Math.max(0, checkedCash - checkedCommission);
+              const { checkedCash, checkedCommission, netToReceive } = handoverModalStats;
 
               return (
                 <>
@@ -2036,21 +2126,7 @@ export default function AdminFinancePage() {
             <form onSubmit={handleConfirmSettlement} className="p-6 overflow-y-auto space-y-5 flex-1">
               {/* ملخص الحسبة للشحنات المحددة */}
               {(() => {
-                const checkedShipments = selectedMerchantForSettlement.shipments.filter((s) =>
-                  selectedSettlementShipmentIds.has(s.id),
-                );
-                const curCod = checkedShipments.reduce(
-                  (sum, s) => sum + (Number(s.collected_cash) || 0),
-                  0,
-                );
-                const curShipping = checkedShipments.reduce(
-                  (sum, s) => sum + (Number(s.shipping_fee) || 0),
-                  0,
-                );
-                const curNet = checkedShipments.reduce(
-                  (sum, s) => sum + (Number(s.merchant_net_amount) || 0),
-                  0,
-                );
+                const { curCod, curShipping, curNet } = settlementModalStats;
 
                 return (
                   <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 grid grid-cols-3 gap-3 text-center text-xs">

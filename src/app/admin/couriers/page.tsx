@@ -21,8 +21,14 @@ import type {
   CourierSettlement,
   CourierSettlementType,
 } from '@/types/database';
+import dynamic from 'next/dynamic';
 import { COURIER_SETTLEMENT_TYPE_LABELS } from '@/types/database';
-import CourierSettlementDetailsModal from '@/components/admin/CourierSettlementDetailsModal';
+
+// استيراد ديناميكي كسول لنافذة تفاصيل التسوية لتقليل First Load JS
+const CourierSettlementDetailsModal = dynamic(
+  () => import('@/components/admin/CourierSettlementDetailsModal'),
+  { ssr: false },
+);
 import {
   Truck,
   Plus,
@@ -347,6 +353,9 @@ export default function AdminCouriersPage() {
       let totalCommissionAmount = 0;
       let totalCashCollected = 0;
 
+      const standardIds: string[] = [];
+      const overrideShipments: { id: string; effComm: number }[] = [];
+
       for (const s of targetShipments) {
         const comm = Number(s.courier_commission) || 0;
         const zone = zones.find((z) => z.id === s.zone_id);
@@ -354,16 +363,40 @@ export default function AdminCouriersPage() {
         totalCommissionAmount += effComm;
         totalCashCollected += Number(s.collected_cash) || 0;
 
-        const updatePayload: {
-          is_courier_commission_settled: boolean;
-          courier_commission?: number;
-        } = {
-          is_courier_commission_settled: true,
-        };
         if (comm === 0 && effComm > 0) {
-          updatePayload.courier_commission = effComm;
+          overrideShipments.push({ id: s.id, effComm });
+        } else {
+          standardIds.push(s.id);
         }
-        await supabase.from('shipments').update(updatePayload).eq('id', s.id);
+      }
+
+      // 1. تحديث جماعي فوري دفعة واحدة للشحنات ذات العمولة المحددة مسبقاً (Batch Update)
+      if (standardIds.length > 0) {
+        const { error: batchErr } = await supabase
+          .from('shipments')
+          .update({ is_courier_commission_settled: true })
+          .in('id', standardIds);
+
+        if (batchErr) throw batchErr;
+      }
+
+      // 2. تحديث متوازٍ بالكامل عبر Promise.all للشحنات التي تحتاج تسجيل العمولة المستحقة
+      if (overrideShipments.length > 0) {
+        const updateResults = await Promise.all(
+          overrideShipments.map((item) =>
+            supabase
+              .from('shipments')
+              .update({
+                is_courier_commission_settled: true,
+                courier_commission: item.effComm,
+              })
+              .eq('id', item.id),
+          ),
+        );
+
+        for (const res of updateResults) {
+          if (res.error) throw res.error;
+        }
       }
 
       // توثيق العملية كـ COMMISSION_PAYOUT في courier_settlements
@@ -391,29 +424,58 @@ export default function AdminCouriersPage() {
     }
   };
 
-  // فلترة المناديب (التبويب الأول)
-  const filteredCouriers = couriers.filter((c) => {
-    const q = searchQuery.toLowerCase();
-    const matchesSearch =
-      c.name.toLowerCase().includes(q) ||
-      c.phone.includes(q) ||
-      (c.national_id && c.national_id.includes(q)) ||
-      (c.default_zone && c.default_zone.name.toLowerCase().includes(q));
+  // فلترة المناديب (التبويب الأول) - Memoized
+  const filteredCouriers = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+    return couriers.filter((c) => {
+      const matchesSearch =
+        !q ||
+        c.name.toLowerCase().includes(q) ||
+        c.phone.includes(q) ||
+        (c.national_id && c.national_id.includes(q)) ||
+        (c.default_zone && c.default_zone.name.toLowerCase().includes(q));
 
-    const matchesStatus =
-      statusFilter === 'ALL' ||
-      (statusFilter === 'ACTIVE' && c.is_active) ||
-      (statusFilter === 'INACTIVE' && !c.is_active);
+      const matchesStatus =
+        statusFilter === 'ALL' ||
+        (statusFilter === 'ACTIVE' && c.is_active) ||
+        (statusFilter === 'INACTIVE' && !c.is_active);
 
-    return matchesSearch && matchesStatus;
-  });
+      return matchesSearch && matchesStatus;
+    });
+  }, [couriers, searchQuery, statusFilter]);
 
-  const totalCouriers = couriers.length;
-  const activeCouriers = couriers.filter((c) => c.is_active).length;
-  const totalActiveShipments = couriers.reduce((acc, c) => acc + c.activeShipmentsCount, 0);
-  const totalUnsettledCash = couriers.reduce((acc, c) => acc + c.unsettledCashAmount, 0);
-  const totalPendingCommissions = couriers.reduce((acc, c) => acc + c.pendingCommission, 0);
-  const totalSettledCommissions = couriers.reduce((acc, c) => acc + c.settledCommission, 0);
+  // احتساب مؤشرات المناديب بدقة وكفاءة (Memoized)
+  const {
+    totalCouriers,
+    activeCouriers,
+    totalActiveShipments,
+    totalUnsettledCash,
+    totalPendingCommissions,
+    totalSettledCommissions,
+  } = useMemo(() => {
+    let active = 0;
+    let activeShipments = 0;
+    let unsettledCash = 0;
+    let pendingComm = 0;
+    let settledComm = 0;
+
+    couriers.forEach((c) => {
+      if (c.is_active) active++;
+      activeShipments += c.activeShipmentsCount;
+      unsettledCash += c.unsettledCashAmount;
+      pendingComm += c.pendingCommission;
+      settledComm += c.settledCommission;
+    });
+
+    return {
+      totalCouriers: couriers.length,
+      activeCouriers: active,
+      totalActiveShipments: activeShipments,
+      totalUnsettledCash: unsettledCash,
+      totalPendingCommissions: pendingComm,
+      totalSettledCommissions: settledComm,
+    };
+  }, [couriers]);
 
   // فلترة سجل التسويات (التبويب الثاني)
   const settlementDateRange = useMemo(

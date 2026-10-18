@@ -75,31 +75,42 @@ export default function AdminDashboardPage() {
     try {
       const supabase = createClient();
 
-      // جلب جميع الشحنات لاحتساب الإحصائيات الدقيقة
-      const { data: shipmentsData, error: shipmentsErr } = await supabase
-        .from('shipments')
-        .select(`
-          id,
-          awb_number,
-          recipient_name,
-          recipient_phone,
-          expected_cod,
-          collected_cash,
-          shipment_type,
-          status,
-          is_courier_cash_settled,
-          created_at,
-          merchants:merchant_id (name, brand_name),
-          zones:zone_id (name, governorate),
-          couriers:courier_id (name)
-        `)
-        .order('created_at', { ascending: false });
+      // جلب جميع الشحنات وطلبات الانضمام بالتوازي عبر Promise.all لتسريع التحميل
+      const [shipmentsRes, leadsRes] = await Promise.all([
+        supabase
+          .from('shipments')
+          .select(`
+            id,
+            awb_number,
+            recipient_name,
+            recipient_phone,
+            expected_cod,
+            collected_cash,
+            shipment_type,
+            status,
+            is_courier_cash_settled,
+            created_at,
+            merchants:merchant_id (name, brand_name),
+            zones:zone_id (name, governorate),
+            couriers:courier_id (name)
+          `)
+          .order('created_at', { ascending: false }),
 
-      if (shipmentsErr) {
-        console.error('Error fetching shipments:', shipmentsErr);
+        supabase
+          .from('merchant_leads')
+          .select('*', { count: 'exact', head: true })
+          .eq('is_contacted', false),
+      ]);
+
+      if (shipmentsRes.error) {
+        console.error('Error fetching shipments:', shipmentsRes.error);
+      }
+      if (leadsRes.error) {
+        console.error('Error fetching leads count:', leadsRes.error);
       }
 
-      const shipments = (shipmentsData as unknown as ShipmentWithDetails[]) || [];
+      const shipments = (shipmentsRes.data as unknown as ShipmentWithDetails[]) || [];
+      const leadsCount = leadsRes.count || 0;
 
       // احتساب الـ KPIs
       let pickup = 0;
@@ -130,12 +141,6 @@ export default function AdminDashboardPage() {
           unsettledCash += Number(s.collected_cash) || 0;
         }
       });
-
-      // جلب عدد طلبات الانضمام غير المقروءة
-      const { count: leadsCount } = await supabase
-        .from('merchant_leads')
-        .select('*', { count: 'exact', head: true })
-        .eq('is_contacted', false);
 
       setStats({
         totalShipments: shipments.length,
