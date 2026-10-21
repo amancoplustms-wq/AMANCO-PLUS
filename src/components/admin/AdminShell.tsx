@@ -244,33 +244,9 @@ export default function AdminShell({ userEmail, initialUserName, children }: Adm
             <Link href="/admin" prefetch={true} className="flex items-center group">
               <BrandLogo size="sm" variant="dark" />
             </Link>
-            <div className="flex items-center gap-1.5 shrink-0">
-              <span className="text-[10px] bg-brand-orange/20 text-brand-orange font-bold px-2 py-0.5 rounded-full border border-brand-orange/30">
-                لوحة الإدارة
-              </span>
-              <button
-                type="button"
-                onClick={toggleSidebar}
-                title="طي القائمة الجانبية لتوسيع الشاشة"
-                className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
-              >
-                <PanelRightClose size={18} />
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* زر فتح السايدبار عند الطي في أعلى القائمة */}
-        {isSidebarCollapsed && (
-          <div className="px-3 pt-2.5 shrink-0">
-            <button
-              type="button"
-              onClick={toggleSidebar}
-              title="فتح القائمة الجانبية"
-              className="w-full p-2 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
-            >
-              <PanelRightOpen size={18} />
-            </button>
+            <span className="text-[10px] bg-brand-orange/20 text-brand-orange font-bold px-2 py-0.5 rounded-full border border-brand-orange/30 shrink-0">
+              لوحة الإدارة
+            </span>
           </div>
         )}
 
