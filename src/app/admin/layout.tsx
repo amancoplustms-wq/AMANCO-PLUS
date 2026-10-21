@@ -21,5 +21,11 @@ export default async function AdminLayout({
     redirect('/login');
   }
 
-  return <AdminShell userEmail={user.email || ''}>{children}</AdminShell>;
+  const initialUserName = (user.user_metadata?.full_name || user.user_metadata?.name || '') as string;
+
+  return (
+    <AdminShell userEmail={user.email || ''} initialUserName={initialUserName}>
+      {children}
+    </AdminShell>
+  );
 }

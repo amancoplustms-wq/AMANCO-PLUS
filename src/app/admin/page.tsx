@@ -4,6 +4,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import {
+  resolveAdminUserName,
+  getTimeBasedGreeting,
+  STORAGE_KEY_USER_NAME,
+} from '@/lib/user-greeting';
+import {
   formatCurrency,
 } from '@/modules/finance/calculator';
 import {
@@ -70,6 +75,32 @@ export default function AdminDashboardPage() {
     unreadLeadsCount: 0,
   });
   const [recentShipments, setRecentShipments] = useState<ShipmentWithDetails[]>([]);
+  const [adminName, setAdminName] = useState<string>('المدير العام');
+  const [greetingTime, setGreetingTime] = useState<string>('صباح الخير');
+
+  // استرجاع اسم الأدمن المسجل دخوله حالياً والتحية الزمنية
+  useEffect(() => {
+    try {
+      const cached = localStorage.getItem(STORAGE_KEY_USER_NAME);
+      if (cached) {
+        setAdminName(cached);
+      }
+    } catch {
+      // ignore
+    }
+
+    const { greeting } = getTimeBasedGreeting();
+    setGreetingTime(greeting);
+
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        const metaName = (user.user_metadata?.full_name || user.user_metadata?.name || '') as string;
+        const name = resolveAdminUserName(user.email, metaName);
+        setAdminName(name);
+      }
+    });
+  }, []);
 
   const fetchDashboardData = useCallback(async () => {
     try {
@@ -198,60 +229,67 @@ export default function AdminDashboardPage() {
   return (
     <div className="space-y-8">
       {/* ==================================================================== */}
-      {/* ترويسة الصفحة مع أزرار الإجراءات السريعة */}
+      {/* ترويسة الصفحة مع البانر الترحيبي الشخصي وأزرار الإجراءات السريعة */}
       {/* ==================================================================== */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-xs">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-black text-brand-navy">
-              لوحة الإحصائيات المركزية
-            </h1>
-            <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 border border-emerald-200">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              نظام حي ومباشر
-            </span>
+      <div className="relative overflow-hidden bg-gradient-to-l from-white via-white to-blue-50/40 p-6 sm:p-7 rounded-2xl border border-slate-200/90 shadow-xs">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5 relative z-10">
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+                <span>مرحباً بك، {adminName}</span>
+                <span className="inline-block animate-wave origin-[70%_70%]">👋</span>
+              </h1>
+              <span className="text-xs font-bold text-brand-orange bg-orange-50 border border-orange-200/80 px-2.5 py-0.5 rounded-full">
+                {greetingTime}
+              </span>
+              <span className="bg-emerald-50 text-emerald-700 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1.5 border border-emerald-200 shadow-2xs">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                نظام حي ومباشر
+              </span>
+            </div>
+            <p className="text-sm text-slate-600 leading-relaxed max-w-3xl">
+              إليك ملخص العمليات والأداء المالي لشركة <span className="font-extrabold text-slate-900">أمانكو بلس للشحن والتوريد</span> اليوم في نطاق القاهرة والجيزة والقليوبية
+            </p>
           </div>
-          <p className="text-sm text-slate-500 mt-1">
-            متابعة حركة الشحنات، السيولة النقدية، وطلبات التجار في القاهرة والجيزة والقليوبية
-          </p>
-        </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
-          <button
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className="flex items-center gap-2 px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer disabled:opacity-60"
-            title="تحديث البيانات"
-          >
-            <RefreshCw size={15} className={refreshing ? 'animate-spin text-brand-orange' : ''} />
-            <span>تحديث</span>
-          </button>
+          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="flex items-center gap-2 px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer disabled:opacity-60"
+              title="تحديث البيانات"
+            >
+              <RefreshCw size={15} className={refreshing ? 'animate-spin text-brand-orange' : ''} />
+              <span>تحديث</span>
+            </button>
 
-          <Link
-            href="/admin/shipments"
-            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all"
-          >
-            <Plus size={16} />
-            <span>إضافة شحنة</span>
-          </Link>
+            <Link
+              href="/admin/shipments"
+              className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all"
+            >
+              <Plus size={16} />
+              <span>إضافة شحنة</span>
+            </Link>
 
-          <Link
-            href="/admin/merchants"
-            className="flex items-center gap-2 px-4 py-2.5 bg-brand-navy hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-sm transition-all"
-          >
-            <Users size={16} />
-            <span>إضافة تاجر</span>
-          </Link>
+            <Link
+              href="/admin/merchants"
+              className="flex items-center gap-2 px-4 py-2.5 bg-brand-navy hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-sm transition-all"
+            >
+              <Users size={16} />
+              <span>إضافة تاجر</span>
+            </Link>
 
-          <Link
-            href="/admin/couriers"
-            className="flex items-center gap-2 px-4 py-2.5 bg-brand-orange hover:bg-orange-600 text-white rounded-xl text-xs font-bold shadow-sm transition-all"
-          >
-            <Truck size={16} />
-            <span>إضافة مندوب</span>
-          </Link>
+            <Link
+              href="/admin/couriers"
+              className="flex items-center gap-2 px-4 py-2.5 bg-brand-orange hover:bg-orange-600 text-white rounded-xl text-xs font-bold shadow-sm transition-all"
+            >
+              <Truck size={16} />
+              <span>المناديب</span>
+            </Link>
+          </div>
         </div>
       </div>
+
 
       {/* ==================================================================== */}
       {/* بطاقات الإحصائيات الرئيسية (KPI Cards) */}
